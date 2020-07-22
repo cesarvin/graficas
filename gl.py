@@ -52,8 +52,8 @@ class Render(object):
     def glVertex(self, x, y):
         glVertexX = ( x + 1 ) * ( self.glViewPortWidth / 2 ) + self.glViewPortX 
         glVertexY = ( y + 1 ) * ( self.glViewPortHeight / 2) + self.glViewPortY 
-        print (round(glVertexX))
-        print (round(glVertexY))
+        #print (round(glVertexX))
+        #print (round(glVertexY))
         self.pixels[round(glVertexY)][round(glVertexX)] = self.pointcolor
 
     def glColor(self, r, g, b):
@@ -99,4 +99,65 @@ class Render(object):
         archivo.close()
 
     def point(self, x, y): 
-        self.pixels[y][x] = self.backcolor
+        self.pixels[y][x] = self.pointcolor
+
+    def glLine(self,x0, y0, x1, y1):
+        '''
+        posibles valores para las coordenadas de la función glLine(x0,y0,x1,y1)
+        x0, y0 pos inicial
+        x1, y1 pos final
+        #
+        (-1,1)         (0,1)         (1,1)
+               +---------+---------+ 
+               |         |         |
+               |         |         |
+        (-1,0) |       (0,0)       | (1,0)
+               +---------+---------+ 
+               |         |         |
+               |         |         |
+               |         |         |
+               +---------+---------+ 
+        (-1,-1)        (0,-1)        (1,-1)
+        '''
+        x0 = ( x0 + 1) * (self.glViewPortWidth  / 2 ) + self.glViewPortX
+        y0 = ( y0 + 1) * (self.glViewPortHeight / 2 ) + self.glViewPortY
+        x1 = ( x1 + 1) * (self.glViewPortWidth  / 2 ) + self.glViewPortX
+        y1 = ( y1 + 1) * (self.glViewPortHeight / 2 ) + self.glViewPortY
+        print(round(x1))
+        print(round(y1))
+        self.line(round(x0), round(y0), round(x1), round(y1))
+
+    def line(self,x0, y0, x1, y1):
+        #implementacion del algoritmo de bresenham para dibujar lineas
+        #basado en el ejemplo de la clase
+        dx = abs(x1 - x0)
+        dy = abs(y1 - y0)
+        steep = dy > dx
+
+        if steep:
+            x0, y0 = y0, x0
+            x1, y1 = y1, x1
+
+        if x0 > x1:
+            x0, x1 = x1, x0
+            y0, y1 = y1, y0
+
+        dx = abs(x1 - x0)
+        dy = abs(y1 - y0)
+        offset = 0
+        limit = 0.5
+        m = dy/dx
+        y = y0
+
+        for x in range(x0, x1 + 1):
+            if steep:
+                self.point(y, x)
+            else:
+                self.point(x, y)
+
+            offset += m
+            if offset >= limit:
+                y += 1 if y0 < y1 else -1
+                limit += 1
+
+    
