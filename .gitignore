@@ -74,7 +74,7 @@ StyleCopReport.xml
 *_h.h
 *.ilk
 *.meta
-*.obj
+#*.obj
 *.iobj
 *.pch
 *.pdb
@@ -362,4 +362,4 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # BMP files
-*.bmp
+#*.bmp

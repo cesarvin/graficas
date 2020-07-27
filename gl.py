@@ -1,5 +1,7 @@
 import struct
 
+from obj import Obj
+
 # Estructuras necesarias para construir el archivo
 # Estructuras basadas en ejemplo realizado en clase
 def char(c):
@@ -146,18 +148,32 @@ class Render(object):
         dy = abs(y1 - y0)
         offset = 0
         limit = 0.5
-        m = dy/dx
-        y = y0
 
-        for x in range(x0, x1 + 1):
-            if steep:
-                self.point(y, x)
-            else:
-                self.point(x, y)
+        if dx != 0:
+            m = dy/dx
+            y = y0
 
-            offset += m
-            if offset >= limit:
-                y += 1 if y0 < y1 else -1
-                limit += 1
+            for x in range(x0, x1 + 1):
+                if steep:
+                    self.point(y, x)
+                else:
+                    self.point(x, y)
+
+                offset += m
+                if offset >= limit:
+                    y += 1 if y0 < y1 else -1
+                    limit += 1
+
+    def glLoadModel(self, filename, translate, scale):
+        model = Obj(filename)
+
+        for face in model.faces:
+            vc = len(face)
+
+            for i in range(vc):
+                v0 = model.vertices[ face[i][0] - 1 ]
+                v1 = model.vertices[ face[(i + 1) % vc][0] - 1]
+
+                self.line(round(v0[0] * scale[0]  + translate[0]), round(v0[1] * scale[1]  + translate[1]), round(v1[0] * scale[0]  + translate[0]), round(v1[1] * scale[1]  + translate[1]))
 
     
