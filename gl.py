@@ -1,9 +1,12 @@
 import struct
 
 from obj import Obj
+from collections import namedtuple
 
-# Estructuras necesarias para construir el archivo
-# Estructuras basadas en ejemplo realizado en clase
+V2 = namedtuple('Point2', ['x', 'y'])
+V3 = namedtuple('Point3', ['x', 'y', 'z'])
+V4 = namedtuple('Point4', ['x', 'y', 'z','w'])
+
 def char(c):
     # 1 byte
     return struct.pack('=c', c.encode('ascii'))
@@ -18,6 +21,22 @@ def dword(d):
 
 def color(r, g, b):
     return bytes([int(b * 255), int(g * 255), int(r * 255)])
+
+
+def baryCoords(A, B, C, P):
+    # u es para la A, v es para B, w para C
+    try:
+        u = ( ((B.y - C.y)*(P.x - C.x) + (C.x - B.x)*(P.y - C.y) ) /
+              ((B.y - C.y)*(A.x - C.x) + (C.x - B.x)*(A.y - C.y)) )
+
+        v = ( ((C.y - A.y)*(P.x - C.x) + (A.x - C.x)*(P.y - C.y) ) /
+              ((B.y - C.y)*(A.x - C.x) + (C.x - B.x)*(A.y - C.y)) )
+
+        w = 1 - u - v
+    except:
+        return -1, -1, -1
+
+    return u, v, w
 
 BLACK = color(0,0,0)
 WHITE = color(1,1,1)
@@ -46,6 +65,7 @@ class Render(object):
 
     def glClear(self):
         self.pixels = [ [ self.backcolor for x in range(self.width)] for y in range(self.height) ]
+        self.zbuffer = [ [ -float('inf') for x in range(self.width)] for y in range(self.height) ]
 
     def glClearColor(self, r, g, b):
         self.backcolor = color(r, g, b) 
@@ -72,9 +92,6 @@ class Render(object):
         archivo.write(char('B'))
         archivo.write(char('M'))
 
-        #archivo.write(bytes('B'.encode('ascii')))
-        #archivo.write(bytes('M'.encode('ascii')))
-
         archivo.write(dword(14 + 40 + self.width * self.height * 3))
         archivo.write(dword(0))
         archivo.write(dword(14 + 40))
@@ -100,36 +117,27 @@ class Render(object):
 
         archivo.close()
 
-    def point(self, x, y): 
-        self.pixels[y][x] = self.pointcolor
+    def point(self, x, y, color = None):
+        try:
+            self.pixels[y][x] = color or self.pointcolor
+        except:
+            pass
 
-    def glLine(self,x0, y0, x1, y1):
-        '''
-        posibles valores para las coordenadas de la función glLine(x0,y0,x1,y1)
-        x0, y0 pos inicial
-        x1, y1 pos final
-        #
-        (-1,1)         (0,1)         (1,1)
-               +---------+---------+ 
-               |         |         |
-               |         |         |
-        (-1,0) |       (0,0)       | (1,0)
-               +---------+---------+ 
-               |         |         |
-               |         |         |
-               |         |         |
-               +---------+---------+ 
-        (-1,-1)        (0,-1)        (1,-1)
-        '''
+    def glLine(self,x0, y0, x1, y1, color = None):
         x0 = ( x0 + 1) * (self.glViewPortWidth  / 2 ) + self.glViewPortX
         y0 = ( y0 + 1) * (self.glViewPortHeight / 2 ) + self.glViewPortY
         x1 = ( x1 + 1) * (self.glViewPortWidth  / 2 ) + self.glViewPortX
         y1 = ( y1 + 1) * (self.glViewPortHeight / 2 ) + self.glViewPortY
         print(round(x1))
         print(round(y1))
-        self.line(round(x0), round(y0), round(x1), round(y1))
+        self.line(round(x0), round(y0), round(x1), round(y1), color)
 
-    def line(self,x0, y0, x1, y1):
+    def line(self, v0, v1, color = None):
+        x0 = v0.x
+        x1 = v1.x
+        y0 = v0.y
+        y1 = v1.y
+
         #implementacion del algoritmo de bresenham para dibujar lineas
         #basado en el ejemplo de la clase
         dx = abs(x1 - x0)
@@ -155,16 +163,16 @@ class Render(object):
 
             for x in range(x0, x1 + 1):
                 if steep:
-                    self.point(y, x)
+                    self.point(y, x, color)
                 else:
-                    self.point(x, y)
+                    self.point(x, y, color)
 
                 offset += m
                 if offset >= limit:
                     y += 1 if y0 < y1 else -1
                     limit += 1
 
-    def glLoadModel(self, filename, translate, scale):
+    def glLoadModel_simple(self, filename, translate, scale):
         model = Obj(filename)
 
         for face in model.faces:
@@ -176,4 +184,150 @@ class Render(object):
 
                 self.line(round(v0[0] * scale[0]  + translate[0]), round(v0[1] * scale[1]  + translate[1]), round(v1[0] * scale[0]  + translate[0]), round(v1[1] * scale[1]  + translate[1]))
 
+    def transform(self, vertex, translate=V3(0,0,0), scale=V3(1,1,1)):
+        return V3(round(vertex[0] * scale.x + translate.x),
+                  round(vertex[1] * scale.y + translate.y),
+                  round(vertex[2] * scale.z + translate.z))
     
+    def glLoadModel(self, filename, translate = V3(0,0,0), scale = V3(1,1,1)):
+        model = Obj(filename)
+
+        light = V3(0,0,1)
+
+        for face in model.faces:
+
+            vertCount = len(face)
+
+            v0 = model.vertices[ face[0][0] - 1 ]
+            v1 = model.vertices[ face[1][0] - 1 ]
+            v2 = model.vertices[ face[2][0] - 1 ]
+
+            v0 = self.transform(v0,translate, scale)
+            v1 = self.transform(v1,translate, scale)
+            v2 = self.transform(v2,translate, scale)
+
+            s1 = V3((v1.x - v0.x), (v1.y - v0.y), (v1.z - v0.z))
+            s2 = V3((v2.x - v0.x), (v2.y - v0.y), (v2.z - v0.z))
+            
+            normal = V3(((s1.y * s2.z)- (s2.y * s1.z)), ((s1.x * s2.z)- (s2.x * s1.z)), ((s1.y * s2.x)- (s2.y * s1.x)))
+            
+            try:
+                norm_normal = ( abs(normal.x)**2 + abs(normal.y)**2 + abs(normal.z)**2 )**(1/2)
+                normal = V3((normal.x / norm_normal), (normal.y / norm_normal), (normal.z / norm_normal))
+                intensity = ((normal.x * light.x) + (normal.y * light.y) + (normal.z * light.z))
+
+                if intensity >=0:
+                    self.triangle_bc(v0,v1,v2, color(intensity, intensity, intensity))
+
+                if vertCount > 3: 
+                    v3 = model.vertices[ face[3][0] - 1 ]
+                    v3 = self.transform(v3,translate, scale)
+                    if intensity >=0:
+                        self.triangle_bc(v0,v2,v3, color(intensity, intensity, intensity))
+            except:
+                pass
+
+    def triangle(self, A, B, C, color = None):
+        
+        def flatBottomTriangle(v1,v2,v3):
+            for y in range(v1.y, v3.y + 1):
+                xi = round( v1.x + (v3.x - v1.x)/(v3.y - v1.y) * (y - v1.y))
+                xf = round( v2.x + (v3.x - v2.x)/(v3.y - v2.y) * (y - v2.y))
+
+                if xi > xf:
+                    xi, xf = xf, xi
+
+                for x in range(xi, xf + 1):
+                    self.point(x,y, color or self.curr_color)
+
+        def flatTopTriangle(v1,v2,v3):
+            for y in range(v1.y, v3.y + 1):
+                xi = round( v2.x + (v2.x - v1.x)/(v2.y - v1.y) * (y - v2.y))
+                xf = round( v3.x + (v3.x - v1.x)/(v3.y - v1.y) * (y - v3.y))
+
+                if xi > xf:
+                    xi, xf = xf, xi
+
+                for x in range(xi, xf + 1):
+                    self.point(x,y, color or self.curr_color)
+
+        if A.y > B.y:
+            A, B = B, A
+        if A.y > C.y:
+            A, C = C, A
+        if B.y > C.y:
+            B, C = C, B
+
+        if A.y == C.y:
+            return
+
+        if A.y == B.y: 
+            flatBottomTriangle(A,B,C)
+        elif B.y == C.y: 
+            flatTopTriangle(A,B,C)
+        else: 
+            x4 = A.x + (C.x - A.x)/(C.y - A.y) * (B.y - A.y)
+            D = V2( round(x4), B.y)
+            flatBottomTriangle(D,B,C)
+            flatTopTriangle(A,B,D)
+
+    def triangle_bc(self, A, B, C, color = None):
+        minX = min(A.x, B.x, C.x)
+        minY = min(A.y, B.y, C.y)
+        maxX = max(A.x, B.x, C.x)
+        maxY = max(A.y, B.y, C.y)
+
+        for x in range(minX, maxX + 1):
+            for y in range(minY, maxY + 1):
+                u, v, w = baryCoords(A, B, C, V2(x, y))
+                if u >= 0 and v >= 0 and w >= 0:
+                    z = A.z * u + B.z * v + C.z * w
+
+                    if z > self.zbuffer[y][x]:
+                        self.point(x, y, color)
+                        self.zbuffer[y][x] = z
+
+
+    def glZBuffer(self, filename):
+        archivo = open(filename, 'wb')
+
+        # File header 14 bytes
+        archivo.write(bytes('B'.encode('ascii')))
+        archivo.write(bytes('M'.encode('ascii')))
+        archivo.write(dword(14 + 40 + self.width * self.height * 3))
+        archivo.write(dword(0))
+        archivo.write(dword(14 + 40))
+
+        # Image Header 40 bytes
+        archivo.write(dword(40))
+        archivo.write(dword(self.width))
+        archivo.write(dword(self.height))
+        archivo.write(word(1))
+        archivo.write(word(24))
+        archivo.write(dword(0))
+        archivo.write(dword(self.width * self.height * 3))
+        archivo.write(dword(0))
+        archivo.write(dword(0))
+        archivo.write(dword(0))
+        archivo.write(dword(0))
+
+        minZ = float('inf')
+        maxZ = -float('inf')
+        for x in range(self.height):
+            for y in range(self.width):
+                if self.zbuffer[x][y] != -float('inf'):
+                    if self.zbuffer[x][y] < minZ:
+                        minZ = self.zbuffer[x][y]
+
+                    if self.zbuffer[x][y] > maxZ:
+                        maxZ = self.zbuffer[x][y]
+
+        for x in range(self.height):
+            for y in range(self.width):
+                depth = self.zbuffer[x][y]
+                if depth == -float('inf'):
+                    depth = minZ
+                depth = (depth - minZ) / (maxZ - minZ)
+                archivo.write(color(depth,depth,depth))
+
+        archivo.close()

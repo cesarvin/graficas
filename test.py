@@ -1,18 +1,13 @@
-from gl import Render
+from gl import Render, color, V2, V3
+from obj import Obj 
+
+import random
 
 r = Render()
+r.glCreateWindow(1200,800)
 
-r.glInit() 
-r.glCreateWindow(800,800) 
-r.glColor(0.5,1,0.6)
+r.glLoadModel( './models/Tiger.obj',  V3(600,50,0), V3(1,1,1))
 
-#camión
-r.glLoadModel('./models/truck.obj', (400,100 ), (150,150) )
-r.glFinish('truck.bmp')
- 
+#r.glFinish('Tiger.bmp')
+r.glZBuffer('Tiger_zbuffer.bmp')
 
-r.glCreateWindow(1200,800) 
-
-#tigre
-r.glLoadModel('./models/Tiger.obj', (600,50 ), (1,1) )
-r.glFinish('tiger.bmp')
