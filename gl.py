@@ -128,8 +128,8 @@ class Render(object):
         y0 = ( y0 + 1) * (self.glViewPortHeight / 2 ) + self.glViewPortY
         x1 = ( x1 + 1) * (self.glViewPortWidth  / 2 ) + self.glViewPortX
         y1 = ( y1 + 1) * (self.glViewPortHeight / 2 ) + self.glViewPortY
-        print(round(x1))
-        print(round(y1))
+        #print(round(x1))
+        #print(round(y1))
         self.line(round(x0), round(y0), round(x1), round(y1), color)
 
     def line(self, v0, v1, color = None):
@@ -189,7 +189,7 @@ class Render(object):
                   round(vertex[1] * scale.y + translate.y),
                   round(vertex[2] * scale.z + translate.z))
     
-    def glLoadModel(self, filename, translate = V3(0,0,0), scale = V3(1,1,1)):
+    def glLoadModel(self, filename, translate = V3(0,0,0), scale = V3(1,1,1), texture = None):
         model = Obj(filename)
 
         light = V3(0,0,1)
@@ -201,29 +201,49 @@ class Render(object):
             v0 = model.vertices[ face[0][0] - 1 ]
             v1 = model.vertices[ face[1][0] - 1 ]
             v2 = model.vertices[ face[2][0] - 1 ]
+            if vertCount > 3:
+                v3 = model.vertices[ face[3][0] - 1 ]
 
             v0 = self.transform(v0,translate, scale)
             v1 = self.transform(v1,translate, scale)
             v2 = self.transform(v2,translate, scale)
+            if vertCount > 3:
+                v3 = self.transform(v3,translate, scale)
+
+            if texture:
+                vt0 = model.texcoords[face[0][1] - 1]
+                vt1 = model.texcoords[face[1][1] - 1]
+                vt2 = model.texcoords[face[2][1] - 1]
+                vt0 = V2(vt0[0], vt0[1])
+                vt1 = V2(vt1[0], vt1[1])
+                vt2 = V2(vt2[0], vt2[1])
+                if vertCount > 3:
+                    vt3 = model.texcoords[face[3][1] - 1]
+                    vt3 = V2(vt3[0], vt3[1])
+            else:
+                vt0 = V2(0,0) 
+                vt1 = V2(0,0) 
+                vt2 = V2(0,0) 
+                vt3 = V2(0,0) 
 
             s1 = V3((v1.x - v0.x), (v1.y - v0.y), (v1.z - v0.z))
             s2 = V3((v2.x - v0.x), (v2.y - v0.y), (v2.z - v0.z))
-            
-            normal = V3(((s1.y * s2.z)- (s2.y * s1.z)), ((s1.x * s2.z)- (s2.x * s1.z)), ((s1.y * s2.x)- (s2.y * s1.x)))
-            
+                
+            normal = V3(((s1.y * s2.z)- (s2.y * s1.z)), -((s1.x * s2.z)- (s2.x * s1.z)), ((s1.x * s2.y)- (s2.x * s1.y)))
+
             try:
                 norm_normal = ( abs(normal.x)**2 + abs(normal.y)**2 + abs(normal.z)**2 )**(1/2)
+            
                 normal = V3((normal.x / norm_normal), (normal.y / norm_normal), (normal.z / norm_normal))
-                intensity = ((normal.x * light.x) + (normal.y * light.y) + (normal.z * light.z))
 
+                intensity = (normal.x * light.x) + (normal.y * light.y) + (normal.z * light.z)
+ 
                 if intensity >=0:
-                    self.triangle_bc(v0,v1,v2, color(intensity, intensity, intensity))
-
-                if vertCount > 3: 
-                    v3 = model.vertices[ face[3][0] - 1 ]
-                    v3 = self.transform(v3,translate, scale)
-                    if intensity >=0:
-                        self.triangle_bc(v0,v2,v3, color(intensity, intensity, intensity))
+                    self.triangle_bc(v0,v1,v2, texture = texture, texcoords = (vt0,vt1,vt2), intensity = intensity )
+                    if vertCount > 3: 
+                        v3 = model.vertices[ face[3][0] - 1 ]
+                        v3 = self.transform(v3,translate, scale)
+                        self.triangle_bc(v0,v2,v3, texture = texture, texcoords = (vt0,vt2,vt3), intensity = intensity)
             except:
                 pass
 
@@ -271,7 +291,7 @@ class Render(object):
             flatBottomTriangle(D,B,C)
             flatTopTriangle(A,B,D)
 
-    def triangle_bc(self, A, B, C, color = None):
+    def triangle_bc(self, A, B, C,  _color = WHITE, texture = None, texcoords = (), intensity = 1):
         minX = min(A.x, B.x, C.x)
         minY = min(A.y, B.y, C.y)
         maxX = max(A.x, B.x, C.x)
@@ -279,15 +299,38 @@ class Render(object):
 
         for x in range(minX, maxX + 1):
             for y in range(minY, maxY + 1):
+                if x >= self.width or x < 0 or y >= self.height or y < 0:
+                    continue
+
                 u, v, w = baryCoords(A, B, C, V2(x, y))
                 if u >= 0 and v >= 0 and w >= 0:
                     z = A.z * u + B.z * v + C.z * w
 
                     if z > self.zbuffer[y][x]:
-                        self.point(x, y, color)
+                        b, g , r = _color
+                        b /= 255
+                        g /= 255
+                        r /= 255
+
+                        b *= intensity
+                        g *= intensity
+                        r *= intensity
+
+                        if texture:
+                            ta, tb, tc = texcoords
+                            tx = ta.x * u + tb.x * v + tc.x * w
+                            ty = ta.y * u + tb.y * v + tc.y * w
+
+                            texColor = texture.getColor(tx, ty)
+                            b *= texColor[0] / 255
+                            g *= texColor[1] / 255
+                            r *= texColor[2] / 255
+                        
+                        #print(r,g,b)
+                        self.point(x, y, color(r,g,b))
                         self.zbuffer[y][x] = z
 
-
+    
     def glZBuffer(self, filename):
         archivo = open(filename, 'wb')
 
@@ -327,7 +370,12 @@ class Render(object):
                 depth = self.zbuffer[x][y]
                 if depth == -float('inf'):
                     depth = minZ
-                depth = (depth - minZ) / (maxZ - minZ)
-                archivo.write(color(depth,depth,depth))
+                    if (maxZ - minZ) > 0:
+                        depth = (depth - minZ) / (maxZ - minZ)
+                    else:
+                        depth = (depth - minZ)
+
+                    archivo.write(color(depth,depth,depth))
+                
 
         archivo.close()
