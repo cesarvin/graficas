@@ -1,11 +1,36 @@
 from gl import Render, color, V2, V3
 from obj import Obj, Texture
+from shaders import *
 
 r = Render()
-r.glCreateWindow(1000,1000)
-r.glClearColor(0.4,0.6,0.5)
-t = Texture('./models/model.bmp')
-r.glLoadModel('./models/model.obj',V3(500,500,0), V3(300,300,300), t)
+r.glCreateWindow(500,500)
 
-r.glFinish('output.bmp')
+r.active_texture = Texture('./models/model.bmp')
+r.active_shader = gourad
 
+posModel = V3( 0, 3, 0)
+r.lookAt(posModel, V3(0,0,-5))
+r.glLoadModel('./models/model.obj', posModel, V3(2,2,2), V3(0,0,0))
+r.glFinish('high_angle.bmp')
+
+r.glClear()
+
+posModel = V3( 0, -3, 0)
+r.lookAt(posModel, V3(0,0,-5))
+r.glLoadModel('./models/model.obj', posModel, V3(2,2,2), V3(0,0,0))
+r.glFinish('low_angle.bmp')
+
+r.glClear()
+
+posModel = V3( 0, 0, 0)
+r.lookAt(posModel, V3(0,0,-5))
+r.glLoadModel('./models/model.obj', posModel, V3(2,2,2), V3(0,0,0))
+r.glFinish('medium_angle.bmp')
+
+
+r.glClear()
+
+posModel = V3( 0, 0, 0)
+r.lookAt(posModel, V3(-3,-3,-0.5))
+r.glLoadModel('./models/model.obj', posModel, V3(2,2,2), V3(0,90,0))
+r.glFinish('dutch_angle.bmp')
