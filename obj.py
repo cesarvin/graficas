@@ -6,7 +6,8 @@ def color(r, g, b):
 
 class Obj(object):
     def __init__(self, filename):
-        with open(filename, 'r') as file:
+        #open(filename, encoding="utf8")
+        with open(filename, 'r', encoding="utf8") as file:
             self.lines = file.read().splitlines()
 
         self.vertices = []
@@ -21,6 +22,7 @@ class Obj(object):
             if line:
                 if len(line) > 0 :
                     if line[0] != '#' :
+                        
                         prefix, value = line.split(' ', 1)
                         value = value.strip().replace('//','/').replace('  ',' ')
 
